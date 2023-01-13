@@ -1,6 +1,8 @@
 # ProfessorPundit
 Discord Bot built for UIC-Trackers discord that fetches and sorts professor's https://www.ratemyprofessors.com ratings.
 
+Built using Go, GraphQL (through HTTP requests), and the Discord API (via github.com/bwmarrin/discordgo). Containerized in Docker
+
 ## Installation
 This bot was written in Go, but developed using Docker, thus the recommended installation method is Docker. Either through Docker run, or docker-compose.
 
