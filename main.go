@@ -11,6 +11,20 @@ import (
 	"sort"
 )
 
+type Class struct {
+	ClassName     string
+	NumProfessors int
+	NumReviews    int
+	Professors    []struct {
+		ProfessorName     string
+		NumReviews        int
+		AvgGrade          string
+		AvgRating         int
+		AvgWouldTakeAgain int
+		TopReview         string
+	}
+}
+
 //"Final" struct that holds all teacher reviews and information
 //fetched from #getAllReviewsByTeacher
 type TeacherReviews struct {
