@@ -115,7 +115,7 @@ func handleError(err error) {
   }
 }
 
-func getAllReviewsByTeacher(teacherID string, count int) ReviewResponse {
+func getAllReviewsByTeacher(teacherID string, count int) Root {
   graphql := GraphQL {
     Query: `
     query RatingsListQuery(
@@ -228,9 +228,34 @@ func getAllReviewsByTeacher(teacherID string, count int) ReviewResponse {
     Variables: map[string]interface{} {
       "count": count,
       "id": teacherID,
-      "cursor": ""
+      "cursor": "",
     },
   }
+
+  query, err := json.Marshal(graphql)
+  handleError(err)
+
+  req, err := http.NewRequest("POST", "https://www.ratemyprofessors.com/graphql", bytes.NewBuffer(query))
+  handleError(err)
+  req.Header.Add("Authorization", "Basic dGVzdDp0ZXN0")
+
+  client := &http.Client{}
+
+  res, err := client.Do(req.WithContext(context.Background()))
+  handleError(err)
+  defer res.Body.Close()
+
+  response, err := ioutil.ReadAll(res.Body)
+  handleError(err)
+
+  var data Root
+
+  if err := json.Unmarshal(response, &data); err != nil {
+    panic(err)
+  } else {
+    return data
+  }
+
 }
 
 func getAllTeachersByDepartment(departmentID string) TeacherResponse {
@@ -325,7 +350,7 @@ func getAllTeachersByDepartment(departmentID string) TeacherResponse {
   }
 }
 
-func printResponse(response Response) {
+func printTeachers(response TeacherResponse) {
   //First sort by highest average rating
   sort.Slice(response.Data.Search.Teachers.Edges, func(i, j int) bool {
 		return response.Data.Search.Teachers.Edges[i].TeacherData.AvgRatingRounded > response.Data.Search.Teachers.Edges[j].TeacherData.AvgRatingRounded
@@ -343,10 +368,23 @@ func printResponse(response Response) {
   }
 }
 
+func printReviews(response Root) {
+  for _, edge := range response.Data.Node.Ratings.Edges {
+    fmt.Println("Review:")
+    fmt.Println("  Class: ", edge.Node.Class)
+    fmt.Println("  Comment: ", edge.Node.Comment)
+    fmt.Println("  Date: ", edge.Node.Date)
+}
+}
+
 func main() {
 
   data := getAllTeachersByDepartment("RGVwYXJ0bWVudC0xMQ==")
 
-  printResponse(data)
+  printTeachers(data)
+
+  data2 := getAllReviewsByTeacher("VGVhY2hlci0xMDUwOQ==", 100)
+
+  printReviews(data2)
 
 }
