@@ -11,6 +11,8 @@ import (
 	"sort"
 )
 
+//"Final" struct that holds all teacher reviews and information
+//fetched from #getAllReviewsByTeacher
 type TeacherReviews struct {
 	Typename   string `json:"__typename"`
 	ID         string `json:"id"`
@@ -46,14 +48,21 @@ type TeacherReviews struct {
 	} `json:"ratings"`
 }
 
+//Helper struct to contain TeacherReviews to match schema returned in JSON
+//from the GraphQL request.
 type Data struct {
 	TeacherReviews TeacherReviews `json:"node"`
 }
 
+//Struct to contain the schema returned in JSON from the
+//getAllTeacherReviews's GraphQL POST request.
 type TeacherReviewsResponse struct {
 	Data Data `json:"data"`
 }
 
+//"Final" struct that holds teacher infomation, most useful is the ID so we can fetch
+//all of the professor's reviews, but other information is included so we don't have
+//to calculate averages on our owns (or sum of ratings)
 type TeacherData struct {
 	AvgDifficulty                float64 `json:"avgDifficulty"`
 	AvgRatingRounded             float64 `json:"avgRatingRounded"`
@@ -64,10 +73,16 @@ type TeacherData struct {
 	WouldTakeAgainPercentRounded float64 `json:"wouldTakeAgainPercentRounded"`
 }
 
+//Helper struct to hold the "Edge", note a lot of these structs are super messy because
+//I am mimicing the GraphQL requests from Chrome's developer tools, there is no public schema
+//for RateMyProfessors at the moment (without fetching through Insomnia or another tool)
 type Edge struct {
 	TeacherData TeacherData `json:"node"`
 }
 
+//Struct to hold the filters used in the GraphQL query for all professors.
+//Doesn't really need to be included, but decided to include it in case anyone
+//wants to make a PR to make this interface a bit more robust.
 type Filters struct {
 	Field   string `json:"field"`
 	Options []struct {
@@ -76,16 +91,24 @@ type Filters struct {
 	} `json:"options"`
 }
 
+//Helper struct that holds Edges, which contains TeacherData instances.
+//It also gives us a nice result count, which I have found to be inaccurate
+//(unless it is describing something other than the edges count + filters count)
 type Teachers struct {
 	Edges       []Edge    `json:"edges"`
 	Filters     []Filters `json:"filters"`
 	ResultCount int       `json:"resultCount"`
 }
 
+//Search object is the result of the filter, it is also what leads us to
+//indidual TeacherData
 type Search struct {
 	Teachers Teachers `json:"teachers"`
 }
 
+//TeachersResponse is the struct used to take the JSON response from
+//the GraphQL POST request recieved in the getAllTeachersByDepartment()
+//function.
 type TeachersResponse struct {
 	Data struct {
 		School struct {
@@ -96,6 +119,8 @@ type TeachersResponse struct {
 	} `json:"data"`
 }
 
+//Struct to hold a generic GraphQL query and variables. Used in all GraphQL POST
+//requests that are queries, and not mutations.
 type GraphQL struct {
 	Query     string                 `json:"query"`
 	Variables map[string]interface{} `json:"variables"`
@@ -109,12 +134,15 @@ func formatClassName(className string) string {
 	return re.ReplaceAllString(className, "${prefix}-${number}")
 }
 
+//Helper function to reduce line complexity of the file. Simply panics at any non-null errors.
 func handleError(err error) {
 	if err != nil {
 		panic(err)
 	}
 }
 
+//Function to get all reviews based on a teacherID. Note: This is not dependant
+//on Department ID or anything, and can be used without any previous calls.
 func getAllReviewsByTeacher(teacherID string, count int) TeacherReviewsResponse {
 	graphql := GraphQL{
 		Query: `
@@ -258,6 +286,8 @@ func getAllReviewsByTeacher(teacherID string, count int) TeacherReviewsResponse 
 
 }
 
+//Function to get all teachers in a given department (from ID). Read the README for
+//instructions on how to get department IDS
 func getAllTeachersByDepartment(departmentID string) TeachersResponse {
 	//Hacky version of what RateMyProfs backend uses when loading more teachers when you click "View All Professors"
 	graphql := GraphQL{
@@ -350,6 +380,8 @@ func getAllTeachersByDepartment(departmentID string) TeachersResponse {
 	}
 }
 
+//Helper function to help display a TeachersResponse.
+//Printed in order from HIGHEST rating to LOWEST rating.
 func printTeachers(response TeachersResponse) {
 	//First sort by highest average rating
 	sort.Slice(response.Data.Search.Teachers.Edges, func(i, j int) bool {
@@ -368,11 +400,12 @@ func printTeachers(response TeachersResponse) {
 	}
 }
 
+//Helper function to print a TeacherReviewsResponse. Not ordered at the moment.
 func printReviews(response TeacherReviewsResponse) {
 	for _, edge := range response.Data.TeacherReviews.Ratings.Edges {
 		fmt.Println("Review:")
 		fmt.Println("  Class: ", edge.Node.Class)
-		fmt.Println("  Comment: ", edge.Node.Comment)
+		fmt.Println("  Comment: ", formatClassName(edge.Node.Comment))
 		fmt.Println("  Date: ", edge.Node.Date)
 	}
 }
