@@ -390,7 +390,6 @@ func printTeachers(response TeachersResponse) {
 
 	for _, edge := range response.Data.Search.Teachers.Edges {
 		teacher := edge.TeacherData
-
 		fmt.Println("\n----------------------------------------")
 		fmt.Println("Teacher Name:", teacher.FirstName, teacher.LastName)
 		fmt.Println("Average Difficulty:", teacher.AvgDifficulty)
@@ -402,11 +401,15 @@ func printTeachers(response TeachersResponse) {
 
 //Helper function to print a TeacherReviewsResponse. Not ordered at the moment.
 func printReviews(response TeacherReviewsResponse) {
+
 	for _, edge := range response.Data.TeacherReviews.Ratings.Edges {
+		fmt.Println("\n----------------------------------------")
 		fmt.Println("Review:")
 		fmt.Println("  Class: ", edge.Node.Class)
-		fmt.Println("  Comment: ", formatClassName(edge.Node.Comment))
+		fmt.Println("  Review: ", formatClassName(edge.Node.Comment))
+		fmt.Println("  Grade:  ", edge.Node.Grade)
 		fmt.Println("  Date: ", edge.Node.Date)
+		fmt.Println("----------------------------------------")
 	}
 }
 
