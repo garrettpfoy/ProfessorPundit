@@ -1,0 +1,7 @@
+version: '3.7'
+
+services:
+  pundit:
+    build: .
+    container_name: pundit
+    restart: unless-stopped
