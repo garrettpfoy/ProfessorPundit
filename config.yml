@@ -1,0 +1,9 @@
+#Config file to determine various run-time attributes.
+
+#What is the schoolID you wish to use:
+schoolID: ${SCHOOL_ID}
+
+#What departments do you want to fetch professors & reviews from:
+departmentID: 
+  - ${DEPARTMENT_ID}
+
