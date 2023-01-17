@@ -447,9 +447,7 @@ func getAllTeachersByDepartment(departmentID string) TeachersResponse {
 
 // Function to take a Teachers response, iterate through each teacher in the department,
 // fetch all reviews, then sort them into classes accordingly.
-func generateClasses(response TeachersResponse) map[string]Class {
-
-	classes := make(map[string]Class)
+func generateClasses(response TeachersResponse, classMap *map[string]Class) {
 
 	for _, edge := range response.Data.Search.Teachers.Edges {
 		teacherID := edge.TeacherData.ID
@@ -481,7 +479,7 @@ func generateClasses(response TeachersResponse) map[string]Class {
 			className := formatClassName(edge.Node.Class)
 
 			//First check to see if we have the class in the map already
-			_, ok := classes[className]
+			_, ok := (*classMap)[className]
 
 			if !ok {
 				//Not in map already
@@ -492,9 +490,9 @@ func generateClasses(response TeachersResponse) map[string]Class {
 					Professors: []Professor{professor},
 				}
 
-				classes[className] = class
+				(*classMap)[className] = class
 			} else {
-				class := classes[className]
+				class := (*classMap)[className]
 
 				class.NumReviews = class.NumReviews + 1
 
@@ -513,12 +511,11 @@ func generateClasses(response TeachersResponse) map[string]Class {
 					class.NumProfessors = class.NumProfessors + 1
 				} 
 
-				classes[className] = class
+				(*classMap)[className] = class
 			}
 		}
 	}
 
-	return classes
 }
 
 func printClasses(classes map[string]Class) {
@@ -569,19 +566,20 @@ func printReviews(response TeacherReviewsResponse) {
 
 func main() {
 
-	config := loadConfig("config.yml")
+	classMap := make(map[string]Class)
+	//config := loadConfig("config.yml")
 
-	fmt.Println("School ID is: ", config.SchoolID)
+	//fmt.Println("School ID is: ", config.SchoolID)
 
-	// data := getAllTeachersByDepartment("RGVwYXJ0bWVudC00Ng==")
+	data := getAllTeachersByDepartment("RGVwYXJ0bWVudC00Ng==")
 
-	// printTeachers(data)
+	printTeachers(data)
 
-	// // data2 := getAllReviewsByTeacher("VGVhY2hlci0yNjUyNDU3", 100)
+	// data2 := getAllReviewsByTeacher("VGVhY2hlci0yNjUyNDU3", 100)
 
-	// // printReviews(data2)
+	// printReviews(data2)
 
-	// classes := generateClasses(data)
+	generateClasses(data, &classMap)
 
-	// printClasses(classes)
+	printClasses(classMap)
 }
