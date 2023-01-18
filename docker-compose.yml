@@ -4,4 +4,3 @@ services:
   pundit:
     build: .
     container_name: pundit
-    restart: unless-stopped
