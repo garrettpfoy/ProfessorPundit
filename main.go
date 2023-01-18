@@ -11,11 +11,16 @@ import (
 	"sort"
 	"time"
 	"gopkg.in/yaml.v2"
+	"github.com/bwmarrin/discordgo"
+	"strings"
+	"strconv"
 )
 
 type Config struct {
 	SchoolID string `yaml:"schoolID"`
 	Departments []string `yaml:"departmentID"`
+	BotToken string `yaml:"discordToken"`
+	ChannelID string `yaml:"channelID"`
 }
 
 //Struct that takes all GraphQL structs and combines them into something useful!
@@ -36,6 +41,8 @@ type Professor struct {
     AvgWouldTakeAgain float64
     TopReview         string
 }
+
+type byAvgRating []Professor
 
 //"Final" struct that holds all teacher reviews and information
 //fetched from #getAllReviewsByTeacher
@@ -156,6 +163,55 @@ func handleError(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (s byAvgRating) Len() int {
+    return len(s)
+}
+
+func (s byAvgRating) Swap(i, j int) {
+    s[i], s[j] = s[j], s[i]
+}
+
+func (s byAvgRating) Less(i, j int) bool {
+    return s[i].AvgRating > s[j].AvgRating
+}
+
+
+//Function to extrac the leading chars in a string befoire a dash (E.g. "MAT-141" --> "MAT"), useful
+//for filtering all classes by which department they truly are in
+func getClassType(className string) string {
+	index := strings.Index(className, "-")
+
+	if index == -1 {
+		return className
+	}
+
+	return className[:index]
+}
+
+//Function to extract the following ints in a string after a dash (E.g. "MAT-141" --> 141), useful
+//for sorting classes by what number it is
+func getClassNumber(className string) int {
+	parts := strings.Split(className, "-")
+
+	last := parts[len(parts) - 1]
+
+	num, _ := strconv.Atoi(last)
+
+	return num
+}
+
+func sortFieldsByClassNumber(fields *[]*discordgo.MessageEmbedField) {
+	sort.Slice(*fields, func(i, j int) bool {
+		return getClassNumber((*fields)[i].Name) < getClassNumber((*fields)[j].Name)
+	})
+}
+
+//Function to get the "level" of a class given a class number
+// E.g. 410 --> 4, 211 --> 2, etc.
+func getClassLevel(number int) int {
+	return (number / 100)
 }
 
 //Function to load in a config file given a string filename
@@ -459,7 +515,7 @@ func generateClasses(response TeachersResponse, classMap *map[string]Class) {
 		//We also want to define our Professor struct so if they teach a class, we can just add their
 		//information to the Class object.
 		professor := Professor{
-			ProfessorName: edge.TeacherData.FirstName + edge.TeacherData.LastName,
+			ProfessorName: edge.TeacherData.FirstName + " " + edge.TeacherData.LastName,
 			NumReviews: 0,
 			AvgGrade: "N/A",
 			AvgRating: edge.TeacherData.AvgRatingRounded,
@@ -472,7 +528,7 @@ func generateClasses(response TeachersResponse, classMap *map[string]Class) {
 			//Increment numReviews
 			professor.NumReviews = professor.NumReviews + 1
 			//Validity checks for review
-			if(isReviewValid(edge.Node.Date, 24) || !isClassValid(formatClassName(edge.Node.Class))) {
+			if(isReviewValid(edge.Node.Date, (12 * 5)) || !isClassValid(formatClassName(edge.Node.Class))) {
 				continue
 			}
 
@@ -524,6 +580,18 @@ func printClasses(classes map[string]Class) {
 	}
 }
 
+//Function to print a map of classes, but filtering out any prefixes that
+//do not match the @param filter. E.g. "CS" will only allow "CS-211", "CS-251", but not
+//"MAT-211"
+func printClassesWithFilter(classes map[string]Class, filter string) {
+	for _, class := range classes {
+
+		if(getClassType(class.ClassName) == filter) {
+			fmt.Println(class)
+		}
+	}
+}
+
 //Helper function to help display a TeachersResponse.
 //Printed in order from HIGHEST rating to LOWEST rating.
 func printTeachers(response TeachersResponse) {
@@ -564,22 +632,94 @@ func printReviews(response TeacherReviewsResponse) {
 	}
 }
 
+func displayTopProfsByClass(classMap map[string]Class) {
+	for className, class := range classMap {
+		fmt.Println("Top professors for class", className)
+
+		sort.Sort(byAvgRating(class.Professors))
+
+		for i, professor := range class.Professors {
+			fmt.Printf("%d. %s (%.1f)\n", i+1, professor.ProfessorName, professor.AvgRating)
+			
+			if(i == 5) {
+				break
+			}
+		}
+	}
+}
+
+func sendEmbed(session *discordgo.Session, channelID string, classMap map[string]Class, filter string) {
+
+	fieldsMap := make(map[int][]*discordgo.MessageEmbedField)
+
+	for className, class := range classMap {
+
+		if(getClassType(className) != filter) {
+			continue
+		}
+
+		sort.Sort(byAvgRating(class.Professors))
+
+		var topProfessors string
+		
+		for i, professor := range class.Professors {
+			topProfessors += fmt.Sprintf("%d. %s (%.1f)\n", i+1, professor.ProfessorName, professor.AvgRating)
+
+			if(i == 5) {
+				break
+			}
+		}
+
+		field := &discordgo.MessageEmbedField {
+			Name: className,
+			Value: topProfessors,
+			Inline: false,
+		}
+
+		classLevel := getClassLevel(getClassNumber(className))
+
+		fieldsMap[classLevel] = append(fieldsMap[classLevel], field)
+
+	}
+
+	for _, value := range fieldsMap {
+		sortFieldsByClassNumber(&value)
+	}
+
+	for i := 1; i <= 5; i++ {
+		embed := &discordgo.MessageEmbed {
+			Title: fmt.Sprintf("Top Professors by Class [%d]", (i * 100)),
+			Color: 0xac1e2d,
+			Fields: fieldsMap[i],
+		}
+
+		_, err := session.ChannelMessageSendEmbed(channelID, embed)
+		handleError(err)
+
+		time.Sleep(time.Second)
+	}
+
+
+}
+
 func main() {
 
 	classMap := make(map[string]Class)
-	//config := loadConfig("config.yml")
+	config := loadConfig("config.yml")
 
 	//fmt.Println("School ID is: ", config.SchoolID)
 
-	data := getAllTeachersByDepartment("RGVwYXJ0bWVudC00Ng==")
+	for _, departmentID := range config.Departments {
+		data := getAllTeachersByDepartment(departmentID)
+		generateClasses(data, &classMap)
+	}
 
-	printTeachers(data)
+	botConnectionInfo := fmt.Sprintf("Bot %s", config.BotToken)
 
-	// data2 := getAllReviewsByTeacher("VGVhY2hlci0yNjUyNDU3", 100)
+	fmt.Println("BotConnectionInfo ---> ", botConnectionInfo)
 
-	// printReviews(data2)
+	session, err := discordgo.New(botConnectionInfo)
+	handleError(err)
 
-	generateClasses(data, &classMap)
-
-	printClasses(classMap)
+	sendEmbed(session, config.ChannelID, classMap, "CS")
 }
