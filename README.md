@@ -9,7 +9,7 @@ This bot was written in Go, but developed using Docker, thus the recommended ins
 I personally prefer docker-compose, especially since it is clone-and-go, so that will be what I am covering in this readme.
 
 ### Install Docker
-Before anything, ensure you have (Docker)[https://www.docker.com] installed. If you wish to use docker-compose, ensure it is downloaded as well.
+Before anything, ensure you have [Docker](https://www.docker.com) installed. If you wish to use docker-compose, ensure it is downloaded as well.
 
 ### Build Container
 ```
